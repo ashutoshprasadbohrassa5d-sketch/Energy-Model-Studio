@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modeling Energy Systems using Relations and Functions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$'],['\\(','\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: '#00e676' },
+            secondary: { DEFAULT: '#00b0ff' },
+            accent: { DEFAULT: '#ffd600' },
+          },
+          fontFamily: { sans: ['Inter','sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: hsl(217,62%,6%); color: hsl(0,0%,95%); font-family:'Inter',sans-serif; }
+    .glass-card { background:rgba(255,255,255,0.03); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.05); }
+    .glow-green { box-shadow:0 0 20px rgba(0,230,118,0.2); border-color:rgba(0,230,118,0.5)!important; }
+    .glow-blue  { box-shadow:0 0 20px rgba(0,176,255,0.2); border-color:rgba(0,176,255,0.5)!important; }
+    .glow-yellow{ box-shadow:0 0 20px rgba(255,214,0,0.2);  border-color:rgba(255,214,0,0.5)!important; }
+    .text-gradient-green { background:linear-gradient(to right,#00e676,#00b0ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    @keyframes dash { to { stroke-dashoffset:-20; } }
+    @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse-anim { animation:pulse2 2s cubic-bezier(.4,0,.6,1) infinite; }
+    input[type=range] { accent-color:#00e676; }
+    a { text-decoration:none; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+// ── Shims ─────────────────────────────────────────────────────────────────────
+const { useState, useEffect, useRef } = React;
+
+// Framer-motion stub (keeps layout identical; just removes entrance animations)
+const motion = new Proxy({}, {
+  get: (_, tag) => ({ children, className, style, ref, ...rest }) =>
+    React.createElement(tag, { className, style, ref }, children)
+});
+const AnimatePresence = ({ children }) => React.createElement(React.Fragment, null, children);
+const useInView = () => true;
+
+// ── Tiny SVG icon helpers ──────────────────────────────────────────────────────
+const Ico = ({ size=20, cls='', viewBox='0 0 24 24', children }) => (
+  <svg width={size} height={size} viewBox={viewBox} fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cls}>{children}</svg>
+);
+const Sun        = ({size,className:c}) => <Ico size={size} cls={c}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></Ico>;
+const Wind       = ({size,className:c}) => <Ico size={size} cls={c}><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></Ico>;
+const Droplets   = ({size,className:c}) => <Ico size={size} cls={c}><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></Ico>;
+const Leaf       = ({size,className:c}) => <Ico size={size} cls={c}><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></Ico>;
+const MapPin     = ({size,className:c}) => <Ico size={size} cls={c}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Ico>;
+const Volume2    = ({size,className:c}) => <Ico size={size} cls={c}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></Ico>;
+const Waves      = ({size,className:c}) => <Ico size={size} cls={c}><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></Ico>;
+const Factory    = ({size,className:c}) => <Ico size={size} cls={c}><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/></Ico>;
+const CheckCircle= ({size,className:c}) => <Ico size={size} cls={c}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Ico>;
+const XCircle    = ({size,className:c}) => <Ico size={size} cls={c}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></Ico>;
+const RotateCcw  = ({size,className:c}) => <Ico size={size} cls={c}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.7L1 10"/></Ico>;
+const Trophy     = ({size,className:c}) => <Ico size={size} cls={c}><polyline points="8 3 4 3 4 9"/><polyline points="16 3 20 3 20 9"/><path d="M4 9a8 8 0 0 0 16 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></Ico>;
+const ChevronRight=({size,className:c}) => <Ico size={size} cls={c}><polyline points="9 18 15 12 9 6"/></Ico>;
+const Zap        = ({size,className:c}) => <Ico size={size} cls={c}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Ico>;
+const CloudOff   = ({size,className:c}) => <Ico size={size} cls={c}><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></Ico>;
+const Activity   = ({size,className:c}) => <Ico size={size} cls={c}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></Ico>;
+const CreditCard = ({size,className:c}) => <Ico size={size} cls={c}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></Ico>;
+
+// ── Recharts destructure ───────────────────────────────────────────────────────
+const {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ReferenceLine, ReferenceDot, BarChart, Bar, Cell
+} = Recharts;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ParticleCanvas
+// ══════════════════════════════════════════════════════════════════════════════
+const ParticleCanvas = () => {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [], raf;
+    const resize = () => {
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight; init();
+    };
+    const init = () => {
+      particles = [];
+      const n = Math.floor((canvas.width * canvas.height) / 10000);
+      for (let i = 0; i < n; i++)
+        particles.push({ x:Math.random()*canvas.width, y:Math.random()*canvas.height,
+          vx:(Math.random()-.5)*.5, vy:(Math.random()-.5)*.5,
+          size:Math.random()*2+.5, alpha:Math.random()*.5+.1 });
+    };
+    const draw = () => {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      particles.forEach((p,i) => {
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.x<0)p.x=canvas.width; if(p.x>canvas.width)p.x=0;
+        if(p.y<0)p.y=canvas.height; if(p.y>canvas.height)p.y=0;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+        ctx.fillStyle=`rgba(0,230,118,${p.alpha})`; ctx.fill();
+        for(let j=i+1;j<particles.length;j++){
+          const p2=particles[j], dx=p.x-p2.x, dy=p.y-p2.y, d=Math.sqrt(dx*dx+dy*dy);
+          if(d<100){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p2.x,p2.y);
+            ctx.strokeStyle=`rgba(0,176,255,${.2*(1-d/100)})`; ctx.stroke(); }
+        }
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    window.addEventListener('resize',resize); resize(); draw();
+    return () => { window.removeEventListener('resize',resize); cancelAnimationFrame(raf); };
+  },[]);
+  return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none" style={{opacity:.6}} />;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NavBar
+// ══════════════════════════════════════════════════════════════════════════════
+const NavBar = () => (
+  <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-white/10 px-6 py-4">
+    <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary flex items-center justify-center"
+          style={{boxShadow:'0 0 10px rgba(0,230,118,.5)', borderColor:'#00e676', background:'rgba(0,230,118,.1)'}}>
+          <div className="w-3 h-3 rounded-full pulse-anim" style={{background:'#00e676'}} />
+        </div>
+        <span className="font-bold text-lg text-white tracking-wide">Energy<span style={{color:'#00e676'}}>Math</span></span>
+      </div>
+      <div className="hidden md:flex items-center gap-6">
+        {['hero','relations','mapping','linear','quadratic','identity','dashboard','summary'].map(s=>(
+          <a key={s} href={`#${s}`} className="text-sm text-gray-300 hover:text-white transition-colors capitalize">{s==='hero'?'Intro':s.charAt(0).toUpperCase()+s.slice(1)}</a>
+        ))}
+        <a href="#quiz" className="text-sm font-medium transition-colors" style={{color:'#00e676'}}>Quiz</a>
+      </div>
+    </div>
+  </nav>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HeroSection
+// ══════════════════════════════════════════════════════════════════════════════
+const Counter = ({ end, label }) => {
+  const [count,setCount]=useState(0);
+  useEffect(()=>{
+    const isInf=end==='∞', fv=isInf?100:Number(end), t0=performance.now();
+    const anim=t=>{ const p=Math.min((t-t0)/2000,1); setCount(Math.floor(p*fv)); if(p<1)requestAnimationFrame(anim); };
+    requestAnimationFrame(anim);
+  },[end]);
+  return (
+    <div className="flex flex-col items-center glass-card p-6 rounded-xl border border-white/10 glow-blue">
+      <div className="text-4xl font-bold text-white mb-2">{end==='∞'?(count===100?'∞':count):count}</div>
+      <div className="text-sm text-gray-400 uppercase tracking-wider">{label}</div>
+    </div>
+  );
+};
+
+const HeroSection = () => (
+  <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden" style={{background:'hsl(217,62%,6%)'}}>
+    <ParticleCanvas />
+    <div className="relative z-10 max-w-7xl mx-auto px-6 w-full py-20 flex flex-col items-center text-center">
+      <div className="mb-6">
+        <span className="px-4 py-1.5 rounded-full border text-sm font-medium tracking-wide mb-6 inline-block"
+          style={{borderColor:'rgba(0,230,118,.3)',background:'rgba(0,230,118,.1)',color:'#00e676'}}>Optional Mathematics</span>
+        <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight leading-tight mb-4">
+          Modeling <span className="text-gradient-green">Energy Systems</span>
+        </h1>
+        <h2 className="text-2xl md:text-3xl text-gray-300 font-light mb-8">using Relations and Functions</h2>
+        <p className="max-w-3xl mx-auto text-lg text-gray-400 leading-relaxed mb-12">
+          Energy systems can be represented mathematically using relations and functions.
+          Mathematical modeling helps us understand energy generation, transmission, allocation, efficiency, and environmental impacts.
+        </p>
+      </div>
+      <div className="w-full max-w-4xl h-64 mb-16 relative">
+        <svg viewBox="0 0 800 200" className="w-full h-full" style={{filter:'drop-shadow(0 0 15px rgba(0,176,255,.3))'}}>
+          <defs>
+            <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#00e676"/><stop offset="100%" stopColor="#00b0ff"/>
+            </linearGradient>
+          </defs>
+          <path d="M 100 100 C 250 50,350 150,500 100 C 600 70,700 130,700 100" fill="none" stroke="url(#lg1)" strokeWidth="2" strokeDasharray="5,5" style={{animation:'dash 2s linear infinite'}}/>
+          <path d="M 100 100 C 250 150,350 50,500 100" fill="none" stroke="url(#lg1)" strokeWidth="2" strokeDasharray="5,5" style={{animation:'dash 2s linear infinite reverse'}}/>
+          <circle cx="100" cy="100" r="8" fill="#00e676" className="pulse-anim"/>
+          <circle cx="500" cy="100" r="12" fill="#00b0ff" className="pulse-anim"/>
+          <circle cx="700" cy="100" r="8" fill="#ffd600" className="pulse-anim"/>
+        </svg>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-5xl">
+        <Counter end="4" label="Energy Sources"/>
+        <Counter end="7" label="Math Models"/>
+        <Counter end="∞" label="Possibilities"/>
+        <Counter end="1" label="Smart Grid"/>
+      </div>
+    </div>
+  </section>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RelationsSection
+// ══════════════════════════════════════════════════════════════════════════════
+const RelationsSection = () => {
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  const sources=[
+    {id:'solar',label:'Solar',icon:Sun,color:'text-yellow-400'},
+    {id:'wind',label:'Wind',icon:Wind,color:'text-blue-300'},
+    {id:'hydro',label:'Hydro',icon:Droplets,color:'text-blue-500'},
+    {id:'biogas',label:'Biogas',icon:Leaf,color:'text-green-500'},
+  ];
+  const impacts=[
+    {id:'land',label:'Land Use',icon:MapPin},
+    {id:'noise',label:'Noise',icon:Volume2},
+    {id:'water',label:'Water Impact',icon:Waves},
+    {id:'carbon',label:'Carbon Emissions',icon:Factory},
+  ];
+  const relation=[['solar','land'],['solar','carbon'],['wind','noise'],['hydro','water'],['biogas','carbon']];
+  return (
+    <section id="relations" className="py-24 px-6" style={{background:'rgba(6,13,26,.5)'}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">Cartesian Product and Relations</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">A mathematical relation maps elements from one set to another. Here we model the environmental impacts of different energy sources.</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-8 mb-16">
+          <div className="glass-card p-8 rounded-2xl border border-white/10 glow-green">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center justify-between">
+              <span>Set A: Energy Sources</span>
+              <span className="text-xl" style={{color:'#00e676'}}>{'$A = \\{S, W, H, B\\}$'}</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {sources.map(s=>(
+                <div key={s.id} className="flex items-center gap-3 p-4 rounded-xl border border-white/5" style={{background:'rgba(255,255,255,.05)'}}>
+                  <s.icon className={s.color}/><span className="text-gray-200">{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="glass-card p-8 rounded-2xl border border-white/10 glow-blue">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center justify-between">
+              <span>Set B: Impacts</span>
+              <span className="text-xl" style={{color:'#00b0ff'}}>{'$B = \\{L, N, W, C\\}$'}</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {impacts.map(i=>(
+                <div key={i.id} className="flex items-center gap-3 p-4 rounded-xl border border-white/5" style={{background:'rgba(255,255,255,.05)'}}>
+                  <i.icon className="text-gray-400"/><span className="text-gray-200">{i.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="glass-card p-8 rounded-2xl border border-white/10 mb-16">
+          <h3 className="text-2xl font-bold text-white mb-6 text-center">Interactive $A \times B$ Grid</h3>
+          <div className="grid grid-cols-4 gap-4">
+            {sources.map(s=>impacts.map(i=>{
+              const inR=relation.some(r=>r[0]===s.id&&r[1]===i.id);
+              return (
+                <div key={`${s.id}-${i.id}`} className="p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all duration-300"
+                  style={inR?{background:'rgba(0,230,118,.2)',borderColor:'#00e676',boxShadow:'0 0 15px rgba(0,230,118,.3)'}:{background:'rgba(255,255,255,.05)',borderColor:'rgba(255,255,255,.05)',opacity:.5}}>
+                  <div className="flex gap-2"><s.icon size={20} className={s.color}/><i.icon size={20} className="text-gray-300"/></div>
+                  <span className="text-xs text-gray-300 text-center">({s.label}, {i.label})</span>
+                </div>
+              );
+            }))}
+          </div>
+          <p className="text-center mt-6 text-gray-400">Highlighted cells represent the relation $R \subseteq A \times B$</p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MappingSection
+// ══════════════════════════════════════════════════════════════════════════════
+const wColors=['#00e676','#00b0ff','#ffd600','#e040fb'];
+const wLabels=['Ward 1','Ward 2','Ward 3','Ward 4'];
+const gLabels=['Solar Grid A','Wind Grid B','Hydro Grid C','Biogas Grid D'];
+const SVG_W=700,SVG_H=360,ORX=90,ORY=150,LCX=130,RCX=570,CY=SVG_H/2;
+const nYs=[CY-110,CY-37,CY+37,CY+110];
+
+const MappingDiagram = ({ animated }) => (
+  <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{maxHeight:360}}>
+    <defs>
+      {wColors.map((c,i)=>(
+        <marker key={i} id={`ah-${i}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill={c}/>
+        </marker>
+      ))}
+      <filter id="gs"><feGaussianBlur stdDeviation="3" result="cb"/><feMerge><feMergeNode in="cb"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <ellipse cx={LCX} cy={CY} rx={ORX} ry={ORY} fill="rgba(0,230,118,.05)" stroke="#00e676" strokeWidth="1.5" strokeOpacity=".5" filter="url(#gs)"/>
+    <text x={LCX} y={CY-ORY-12} textAnchor="middle" fill="#9ca3af" fontSize="11" fontWeight="600" letterSpacing="2">DOMAIN</text>
+    <text x={LCX} y={CY-ORY+4}  textAnchor="middle" fill="#00e676" fontSize="13" fontWeight="700">Wards</text>
+    <ellipse cx={RCX} cy={CY} rx={ORX} ry={ORY} fill="rgba(0,176,255,.05)" stroke="#00b0ff" strokeWidth="1.5" strokeOpacity=".5" filter="url(#gs)"/>
+    <text x={RCX} y={CY-ORY-12} textAnchor="middle" fill="#9ca3af" fontSize="11" fontWeight="600" letterSpacing="2">CODOMAIN</text>
+    <text x={RCX} y={CY-ORY+4}  textAnchor="middle" fill="#00b0ff" fontSize="13" fontWeight="700">Micro-Grids</text>
+    {wColors.map((c,i)=>{ const y=nYs[i],x1=LCX+ORX+2,x2=RCX-ORX-10,len=x2-x1; return (
+      <line key={i} x1={x1} y1={y} x2={x2} y2={y} stroke={c} strokeWidth="2.5"
+        markerEnd={`url(#ah-${i})`} filter="url(#gs)"
+        style={{strokeDasharray:len,strokeDashoffset:animated?0:len,transition:`stroke-dashoffset .9s cubic-bezier(.4,0,.2,1) ${i*.2}s`}}/>
+    );})}
+    {wLabels.map((l,i)=><g key={i}><circle cx={LCX} cy={nYs[i]} r="22" fill={`${wColors[i]}18`} stroke={wColors[i]} strokeWidth="1.5"/><text x={LCX} y={nYs[i]+5} textAnchor="middle" fill={wColors[i]} fontSize="11" fontWeight="700">{l}</text></g>)}
+    {gLabels.map((l,i)=>{ const p=l.split(' '); return <g key={i}><circle cx={RCX} cy={nYs[i]} r="28" fill={`${wColors[i]}18`} stroke={wColors[i]} strokeWidth="1.5"/><text x={RCX} y={nYs[i]-4} textAnchor="middle" fill={wColors[i]} fontSize="9.5" fontWeight="700">{p[0]} {p[1]}</text><text x={RCX} y={nYs[i]+9} textAnchor="middle" fill={wColors[i]} fontSize="9.5" fontWeight="700">{p[2]}</text></g>;})}
+    <text x={SVG_W/2} y={CY+ORY+22} textAnchor="middle" fill="#6b7280" fontSize="12" fontStyle="italic">f : Wards → Micro-Grids (Bijective mapping)</text>
+  </svg>
+);
+
+const MappingSection = () => {
+  const ref=useRef(null);
+  const [animated,setAnimated]=useState(false);
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  useEffect(()=>{
+    const obs=new IntersectionObserver(([e])=>{ if(e.isIntersecting)setAnimated(true); },{threshold:.1});
+    if(ref.current)obs.observe(ref.current); return()=>obs.disconnect();
+  },[]);
+  const cards=[
+    {title:'Injective (One-to-One)',color:'#00e676',glow:'glow-green',math:'$f(a_1) = f(a_2) \\implies a_1 = a_2$',desc:'No two wards share the same micro-grid. Each ward has a unique dedicated energy source.'},
+    {title:'Surjective (Onto)',color:'#00b0ff',glow:'glow-blue',math:'$\\forall\\, g \\in \\text{Grids},\\; \\exists\\, w \\in \\text{Wards}: f(w) = g$',desc:'Every micro-grid is assigned to at least one ward. No grid sits idle.'},
+    {title:'Bijective (Perfect Match)',color:'#ffd600',glow:'glow-yellow',math:'$f$ is injective $\\wedge$ surjective',desc:'Both one-to-one and onto, forming a perfect one-to-one correspondence.'},
+  ];
+  return (
+    <section id="mapping" className="py-24 px-6" style={{background:'rgba(6,13,26,.3)'}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">One-to-One and Onto Function</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">Modeling clean-energy allocation: each ward receives power from exactly one dedicated micro-grid.</p>
+        </div>
+        <div ref={ref} className="glass-card p-8 rounded-2xl border border-white/10 mb-10 mx-auto max-w-3xl">
+          <MappingDiagram animated={animated}/>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {cards.map(({title,color,glow,math,desc})=>(
+            <div key={title} className={`glass-card p-6 rounded-2xl border ${glow}`} style={{borderColor:`${color}50`}}>
+              <div className="flex items-center gap-3 mb-4">
+                <CheckCircle style={{color}} size={24}/><h3 className="text-lg font-bold text-white">{title}</h3>
+              </div>
+              <div className="p-3 rounded-lg text-center text-sm mb-3" style={{background:'rgba(0,0,0,.4)'}}>{math}</div>
+              <p className="text-sm text-gray-400">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LinearSection
+// ══════════════════════════════════════════════════════════════════════════════
+const LinearSection = () => {
+  const [years,setYears]=useState(10);
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  const data=Array.from({length:21},(_,i)=>({x:i,y:50*i+100}));
+  return (
+    <section id="linear" className="py-24 px-6" style={{background:'rgba(6,13,26,.3)'}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">Linear Function Model</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">Modeling carbon offset over time assuming constant implementation rate.</p>
+        </div>
+        <div className="grid md:grid-cols-12 gap-8 items-center">
+          <div className="md:col-span-4 space-y-6">
+            <div className="glass-card p-6 rounded-2xl border border-white/10 glow-green">
+              <h3 className="text-xl font-bold text-white mb-4">Carbon Offset Function</h3>
+              <div className="text-2xl text-center mb-4" style={{color:'#00e676'}}>{'$f(x) = 50x + 100$'}</div>
+              <p className="text-gray-300 text-sm mb-4">Where $x$ is years, and $f(x)$ is cumulative carbon offset in tonnes CO₂.</p>
+              <div className="space-y-4">
+                <label className="text-sm text-gray-400">Select Year ($x$): {years}</label>
+                <input type="range" min="0" max="20" value={years} onChange={e=>setYears(Number(e.target.value))} className="w-full"/>
+              </div>
+              <div className="mt-6 p-4 rounded-xl border text-center font-mono" style={{background:'rgba(0,230,118,.1)',borderColor:'rgba(0,230,118,.3)'}}>
+                <div className="text-sm text-gray-400 mb-1">Result at Year {years}:</div>
+                <div className="text-2xl font-bold text-white">{50*years+100}</div>
+                <div className="text-xs mt-1" style={{color:'#00e676'}}>tonnes CO₂</div>
+              </div>
+            </div>
+            <div className="glass-card p-6 rounded-2xl border border-white/10">
+              <h4 className="font-bold text-white mb-2">Interpretation</h4>
+              <p className="text-sm text-gray-400">Carbon offset increases at a constant rate (slope = 50 tonnes/year). The y-intercept (100) represents the initial offset from pre-existing systems.</p>
+            </div>
+          </div>
+          <div className="md:col-span-8 glass-card p-6 rounded-2xl border border-white/10" style={{height:500}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{top:20,right:30,left:20,bottom:20}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)"/>
+                <XAxis dataKey="x" stroke="#888" label={{value:'Years (x)',position:'insideBottom',offset:-10,fill:'#888'}}/>
+                <YAxis stroke="#888" label={{value:'Carbon Offset (tonnes)',angle:-90,position:'insideLeft',fill:'#888'}}/>
+                <Tooltip contentStyle={{backgroundColor:'rgba(6,13,26,.9)',borderColor:'rgba(255,255,255,.1)',borderRadius:'8px'}}
+                  itemStyle={{color:'#00e676'}} labelStyle={{color:'#fff'}}
+                  formatter={v=>[`${v} tonnes`,'Offset']} labelFormatter={l=>`Year ${l}`}/>
+                <ReferenceLine x={years} stroke="#00b0ff" strokeDasharray="3 3"/>
+                <Line type="monotone" dataKey="y" stroke="#00e676" strokeWidth={3} dot={false} activeDot={{r:8,fill:'#00e676',stroke:'#fff'}} animationDuration={2000}/>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QuadraticSection
+// ══════════════════════════════════════════════════════════════════════════════
+const QuadraticSection = () => {
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  const data=Array.from({length:17},(_,i)=>({x:i,y:-0.5*i*i+8*i+20}));
+  return (
+    <section id="quadratic" className="py-24 px-6" style={{background:'rgba(6,13,26,.5)'}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">Quadratic Function Model</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">Modeling efficiency curves showing optimal capacity and diminishing returns.</p>
+        </div>
+        <div className="grid md:grid-cols-12 gap-8 items-center">
+          <div className="md:col-span-8 glass-card p-6 rounded-2xl border border-white/10 glow-yellow" style={{height:500}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{top:20,right:30,left:20,bottom:20}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)"/>
+                <XAxis dataKey="x" stroke="#888" label={{value:'Installed Capacity (GW)',position:'insideBottom',offset:-10,fill:'#888'}}/>
+                <YAxis stroke="#888" label={{value:'Efficiency Rating',angle:-90,position:'insideLeft',fill:'#888'}}/>
+                <Tooltip contentStyle={{backgroundColor:'rgba(6,13,26,.9)',borderColor:'rgba(255,255,255,.1)',borderRadius:'8px'}}
+                  itemStyle={{color:'#ffd600'}} labelStyle={{color:'#fff'}}
+                  formatter={v=>[`${v} rating`,'Efficiency']} labelFormatter={l=>`${l} GW`}/>
+                <ReferenceDot x={8} y={52} r={8} fill="#ffd600" stroke="#fff" strokeWidth={2}/>
+                <Line type="monotone" dataKey="y" stroke="#ffd600" strokeWidth={3} dot={false} animationDuration={2000}/>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="md:col-span-4 space-y-6">
+            <div className="glass-card p-6 rounded-2xl border border-white/10">
+              <h3 className="text-xl font-bold text-white mb-4">Efficiency Curve</h3>
+              <div className="text-2xl text-center mb-4" style={{color:'#ffd600'}}>{'$g(x) = -0.5x^2 + 8x + 20$'}</div>
+              <p className="text-gray-300 text-sm mb-4">Where $x$ is installed renewable capacity (GW), and $g(x)$ is the efficiency rating.</p>
+              <div className="mt-6 p-4 rounded-xl border text-center" style={{background:'rgba(255,214,0,.1)',borderColor:'rgba(255,214,0,.3)'}}>
+                <div className="text-sm text-gray-400 mb-2">Vertex (Maximum Point)</div>
+                <div className="text-xl font-bold text-white">Maximum Efficiency: 52</div>
+                <div className="text-sm" style={{color:'#ffd600'}}>at $x = 8$ GW</div>
+              </div>
+            </div>
+            <div className="glass-card p-6 rounded-2xl border border-white/10">
+              <h4 className="font-bold text-white mb-2">Interpretation</h4>
+              <p className="text-sm text-gray-400">Efficiency peaks at 8 GW installed capacity, then decreases due to grid congestion and transmission limits — showing diminishing returns.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IdentitySection
+// ══════════════════════════════════════════════════════════════════════════════
+const IdentitySection = () => {
+  const [energy,setEnergy]=useState(100);
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  const data=Array.from({length:11},(_,i)=>({x:i*20,y:i*20}));
+  const examples=[50,100,150,200].map(v=>({input:v,output:v}));
+  const fp=energy/200;
+  return (
+    <section id="identity" className="py-24 px-6" style={{background:'rgba(6,13,26,.5)'}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">Identity Function Model</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">The smart meter feedback system issues credits equal to energy consumed — a perfect identity mapping.</p>
+        </div>
+        <div className="grid lg:grid-cols-2 gap-10 items-start">
+          <div className="space-y-6">
+            <div className="glass-card p-8 rounded-2xl glow-green" style={{border:'1px solid rgba(0,230,118,.5)'}}>
+              <h3 className="text-xl font-bold text-white mb-2">Smart Meter Feedback</h3>
+              <div className="text-2xl text-center mb-6" style={{color:'#00e676'}}>{'$i(x) = x$'}</div>
+              <div className="flex items-center justify-center mb-8">
+                <svg viewBox="0 0 400 120" className="w-full max-w-md">
+                  <defs>
+                    <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#00e676"/><stop offset="100%" stopColor="#00b0ff"/></linearGradient>
+                    <filter id="gf"><feGaussianBlur stdDeviation="3" result="cb"/><feMerge><feMergeNode in="cb"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <text x="40" y="20" fill="#9ca3af" fontSize="12" textAnchor="middle">Energy Input</text>
+                  <text x="40" y="38" fill="#00e676" fontSize="16" fontWeight="bold" textAnchor="middle">{energy} kWh</text>
+                  <line x1="80" y1="60" x2="130" y2="60" stroke="#00e676" strokeWidth="2" filter="url(#gf)"/>
+                  <polygon points="130,55 140,60 130,65" fill="#00e676"/>
+                  <rect x="140" y="35" width="120" height="50" rx="10" fill="rgba(0,230,118,.1)" stroke="#00e676" strokeWidth="1.5"/>
+                  <text x="200" y="58" fill="white" fontSize="11" textAnchor="middle" fontWeight="600">SMART METER</text>
+                  <text x="200" y="75" fill="#00e676" fontSize="14" textAnchor="middle" fontWeight="bold">i(x) = x</text>
+                  <rect x="145" y="40" width={Math.max(0,fp*110)} height="8" rx="4" fill="url(#fg)" opacity="0.4" style={{transition:'width .5s ease'}}/>
+                  <line x1="260" y1="60" x2="310" y2="60" stroke="#00b0ff" strokeWidth="2" filter="url(#gf)"/>
+                  <polygon points="310,55 320,60 310,65" fill="#00b0ff"/>
+                  <text x="360" y="20" fill="#9ca3af" fontSize="12" textAnchor="middle">Credits Out</text>
+                  <text x="360" y="38" fill="#00b0ff" fontSize="16" fontWeight="bold" textAnchor="middle">{energy}</text>
+                </svg>
+              </div>
+              <div className="space-y-4">
+                <label className="text-sm text-gray-400 flex justify-between">
+                  <span>Energy Input: <span className="text-white font-semibold">{energy} kWh</span></span>
+                  <span>Credits: <span className="font-semibold" style={{color:'#00b0ff'}}>{energy}</span></span>
+                </label>
+                <input type="range" min="0" max="200" step="10" value={energy} onChange={e=>setEnergy(Number(e.target.value))} className="w-full"/>
+                <div className="text-center p-4 rounded-xl border" style={{background:'rgba(0,230,118,.1)',borderColor:'rgba(0,230,118,.3)'}}>
+                  <div className="text-2xl font-bold text-white">{energy} kWh = {energy} Credits</div>
+                  <div className="text-sm mt-1" style={{color:'#00e676'}}>Input Energy = Output Credit</div>
+                </div>
+              </div>
+            </div>
+            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+              <div className="p-4 border-b border-white/10"><h4 className="text-white font-bold">Example Values</h4></div>
+              <table className="w-full">
+                <thead><tr className="border-b border-white/5">
+                  <th className="p-3 text-left text-gray-400 text-sm">Input x (kWh)</th>
+                  <th className="p-3 text-center text-gray-400 text-sm">Function</th>
+                  <th className="p-3 text-right text-gray-400 text-sm">Output i(x)</th>
+                </tr></thead>
+                <tbody>{examples.map(e=>(
+                  <tr key={e.input} className="border-b border-white/5">
+                    <td className="p-3 font-mono font-bold" style={{color:'#00e676'}}>{e.input}</td>
+                    <td className="p-3 text-center text-gray-400 text-sm">i(x) = x</td>
+                    <td className="p-3 text-right font-mono font-bold" style={{color:'#00b0ff'}}>{e.output}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="glass-card p-6 rounded-2xl border border-white/10" style={{height:400}}>
+              <h4 className="text-white font-semibold mb-4 text-center">Graph of i(x) = x</h4>
+              <ResponsiveContainer width="100%" height="90%">
+                <LineChart data={data} margin={{top:10,right:20,left:10,bottom:20}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/>
+                  <XAxis dataKey="x" stroke="#888" label={{value:'Input Energy x (kWh)',position:'insideBottom',offset:-10,fill:'#888',fontSize:12}}/>
+                  <YAxis stroke="#888" label={{value:'Credits i(x)',angle:-90,position:'insideLeft',fill:'#888',fontSize:12}}/>
+                  <Tooltip contentStyle={{backgroundColor:'rgba(6,13,26,.95)',borderColor:'rgba(255,255,255,.1)',borderRadius:'8px'}}
+                    itemStyle={{color:'#00e676'}} labelStyle={{color:'#fff'}}
+                    formatter={v=>[`${v} Credits`,'i(x)']} labelFormatter={l=>`Input: ${l} kWh`}/>
+                  <Line type="linear" dataKey="y" stroke="#00e676" strokeWidth={3} dot={{fill:'#00e676',r:4,strokeWidth:0}} animationDuration={1500}/>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="glass-card p-6 rounded-2xl glow-blue" style={{border:'1px solid rgba(0,176,255,.5)'}}>
+              <h4 className="font-bold text-white mb-3">Mathematical Interpretation</h4>
+              <div className="p-3 rounded-lg text-center text-sm mb-4" style={{background:'rgba(0,0,0,.4)'}}>{'$i : \\mathbb{R} \\to \\mathbb{R},\\quad i(x) = x$'}</div>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li className="flex items-start gap-2"><span style={{color:'#00e676'}} className="mt-1">▪</span>The slope is exactly 1 — the graph is a perfect diagonal line.</li>
+                <li className="flex items-start gap-2"><span style={{color:'#00e676'}} className="mt-1">▪</span>The identity function is simultaneously injective, surjective, and bijective.</li>
+                <li className="flex items-start gap-2"><span style={{color:'#00e676'}} className="mt-1">▪</span>In the smart grid: every unit of energy consumed earns exactly one credit — no waste, no gain.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DashboardSection
+// ══════════════════════════════════════════════════════════════════════════════
+const CircularProgress = ({ percent, color, size=100 }) => {
+  const r=40, c=2*Math.PI*r;
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="8"/>
+      <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c-(percent/100)*c}
+        transform="rotate(-90 50 50)"
+        style={{transition:'stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)',filter:`drop-shadow(0 0 6px ${color})`}}/>
+      <text x="50" y="54" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">{percent}%</text>
+    </svg>
+  );
+};
+const AnimatedCount = ({ end, suffix, active }) => {
+  const [n,setN]=useState(0);
+  useEffect(()=>{
+    if(!active)return;
+    let t0=null;
+    const step=ts=>{ if(!t0)t0=ts; const p=Math.min((ts-t0)/2000,1); setN(Math.floor((1-Math.pow(1-p,3))*end)); if(p<1)requestAnimationFrame(step); else setN(end); };
+    requestAnimationFrame(step);
+  },[end,active]);
+  return <span>{n.toLocaleString()}<span className="text-xl ml-1">{suffix}</span></span>;
+};
+const MetricCard = ({ title, value, suffix, percent, color, icon:Icon, description }) => {
+  const [active,setActive]=useState(false);
+  const ref=useRef(null);
+  useEffect(()=>{
+    const obs=new IntersectionObserver(([e])=>{ if(e.isIntersecting)setActive(true); },{threshold:.3});
+    if(ref.current)obs.observe(ref.current); return()=>obs.disconnect();
+  },[]);
+  return (
+    <div ref={ref} className="glass-card p-6 rounded-2xl flex flex-col items-center text-center"
+      style={{border:`1px solid ${color}40`,boxShadow:`0 0 20px ${color}20`}}>
+      <div className="flex items-center gap-2 mb-4"><Icon size={20} style={{color}}/><span className="text-sm text-gray-300 font-medium uppercase tracking-wide">{title}</span></div>
+      <CircularProgress percent={active?percent:0} color={color} size={100}/>
+      <div className="mt-4 text-3xl font-bold" style={{color}}><AnimatedCount end={value} suffix={suffix} active={active}/></div>
+      <p className="mt-2 text-xs text-gray-500 leading-relaxed">{description}</p>
+    </div>
+  );
+};
+const barData=[{source:'Solar',output:312},{source:'Wind',output:248},{source:'Hydro',output:187},{source:'Biogas',output:100}];
+const barColors=['#ffd600','#00b0ff','#00e676','#e040fb'];
+
+const DashboardSection = () => (
+  <section id="dashboard" className="py-24 px-6" style={{background:'rgba(6,13,26,.3)'}}>
+    <div className="max-w-7xl mx-auto">
+      <div className="text-center mb-16">
+        <h2 className="text-4xl font-bold text-white mb-4">Energy Dashboard</h2>
+        <p className="text-gray-400 text-lg max-w-2xl mx-auto">Real-time visualization of our smart micro-grid system performance and environmental impact.</p>
+      </div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-12">
+        <MetricCard title="Renewable Production" value={847}   suffix="MW" percent={73} color="#00e676" icon={Zap}        description="Total megawatts generated across all renewable sources this cycle."/>
+        <MetricCard title="Carbon Offset"         value={2340}  suffix="t"  percent={68} color="#00b0ff" icon={CloudOff}   description="Tonnes of CO₂ avoided compared to equivalent fossil fuel generation."/>
+        <MetricCard title="Grid Efficiency"        value={91}    suffix="%"  percent={91} color="#ffd600" icon={Activity}   description="Percentage of generated power successfully delivered to consumers."/>
+        <MetricCard title="Consumer Credits"       value={15200} suffix=""   percent={85} color="#e040fb" icon={CreditCard} description="Credits issued to households via the smart meter identity function."/>
+      </div>
+      <div className="glass-card p-8 rounded-2xl border border-white/10">
+        <h3 className="text-xl font-bold text-white mb-6 text-center">Monthly Energy Production by Source (MW)</h3>
+        <div style={{height:288}}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barData} margin={{top:10,right:20,left:10,bottom:10}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/>
+              <XAxis dataKey="source" stroke="#888" tick={{fill:'#ccc',fontSize:13}}/>
+              <YAxis stroke="#888" tick={{fill:'#888',fontSize:12}} label={{value:'Output (MW)',angle:-90,position:'insideLeft',fill:'#888',fontSize:12}}/>
+              <Tooltip contentStyle={{backgroundColor:'rgba(6,13,26,.95)',borderColor:'rgba(255,255,255,.1)',borderRadius:'8px'}}
+                itemStyle={{color:'#fff'}} labelStyle={{color:'#fff',fontWeight:'bold'}} formatter={v=>[`${v} MW`,'Output']}/>
+              <Bar dataKey="output" radius={[6,6,0,0]} animationDuration={1500}>
+                {barData.map((_,i)=><Cell key={i} fill={barColors[i]}/>)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SummarySection
+// ══════════════════════════════════════════════════════════════════════════════
+const summaryCards=[
+  {title:'Cartesian Product',  math:'$A \\times B = \\{(a, b) \\mid a \\in A, b \\in B\\}$',         desc:'The set of all possible ordered pairs from set A to set B.',               color:'#00e676'},
+  {title:'Relation',           math:'$R \\subseteq A \\times B$',                                       desc:'A subset of the Cartesian product showing specific connections.',           color:'#00b0ff'},
+  {title:'Injective Function', math:'$f(a_1) = f(a_2) \\implies a_1 = a_2$',                          desc:'One-to-one: Distinct elements map to distinct elements.',                   color:'#ffd600'},
+  {title:'Surjective Function',math:'$\\forall b \\in B, \\exists a \\in A \\text{ s.t. } f(a) = b$', desc:'Onto: Every element in the codomain is mapped to.',                        color:'#e040fb'},
+  {title:'Linear Function',    math:'$f(x) = mx + c$',                                                 desc:'Constant rate of change. Forms a straight line.',                          color:'#00e676'},
+  {title:'Quadratic Function', math:'$g(x) = ax^2 + bx + c$',                                         desc:'Forms a parabola. Models optimization and diminishing returns.',             color:'#00b0ff'},
+  {title:'Identity Function',  math:'$i(x) = x$',                                                      desc:'Output exactly equals input. Models perfect 1:1 transfer.',                color:'#ffd600'},
+  {title:'Bijective Function', math:'$f \\text{ is injective } \\land \\text{ surjective}$',           desc:'Perfect one-to-one correspondence between sets.',                          color:'#e040fb'},
+];
+const SummarySection = () => {
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[]);
+  return (
+    <section id="summary" className="py-24 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">Mathematical Summary</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">A review of the core mathematical concepts used in modeling our energy systems.</p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {summaryCards.map((card,i)=>(
+            <div key={i} className="glass-card p-6 rounded-xl hover:bg-white/10 transition-colors"
+              style={{borderLeft:`4px solid ${card.color}`}}>
+              <h3 className="text-lg font-bold text-white mb-4">{card.title}</h3>
+              <div className="p-4 rounded-lg mb-4 text-center text-lg flex items-center justify-center" style={{background:'rgba(0,0,0,.5)',minHeight:80}}>{card.math}</div>
+              <p className="text-sm text-gray-400">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QuizSection
+// ══════════════════════════════════════════════════════════════════════════════
+const questions=[
+  {id:1,topic:'Cartesian Product',question:'If A = {Solar, Wind} and B = {Land Use, Noise}, how many elements are in A × B?',options:['2','4','6','8'],correct:1,explanation:'A × B contains every ordered pair (a, b) where a ∈ A and b ∈ B. With |A| = 2 and |B| = 2, |A × B| = 2 × 2 = 4.'},
+  {id:2,topic:'Relation',question:'Which statement correctly describes a relation R ⊆ A × B?',options:['R must contain all pairs in A × B','R is any subset of the Cartesian product A × B','R must map every element of A to exactly one element of B','R only contains pairs where both elements are equal'],correct:1,explanation:'A relation R is simply any subset of A × B. It can be the full product, a partial selection, or even empty.'},
+  {id:3,topic:'Injective Function',question:'In our ward-to-grid mapping (Ward 1→Solar, Ward 2→Wind, Ward 3→Hydro, Ward 4→Biogas). Why is this injective?',options:['Every grid is assigned to a ward','No two wards share the same micro-grid','Each ward is assigned exactly two grids','The mapping includes all possible pairs'],correct:1,explanation:'A function is injective when distinct inputs produce distinct outputs: f(a₁) = f(a₂) ⟹ a₁ = a₂. No two wards share a grid.'},
+  {id:4,topic:'Surjective Function',question:'For a function to be surjective (onto), which condition must hold?',options:['Every element in the domain maps to itself','No two elements share the same output','Every element in the codomain is the image of at least one input','The domain and codomain must have the same size'],correct:2,explanation:'Surjective means every b ∈ B has some a ∈ A with f(a) = b. Every micro-grid is assigned — none goes unused.'},
+  {id:5,topic:'Linear Function',question:'Using f(x) = 50x + 100, what is the carbon offset after 6 years?',options:['300 tonnes','400 tonnes','500 tonnes','600 tonnes'],correct:1,explanation:'f(6) = 50 × 6 + 100 = 300 + 100 = 400 tonnes CO₂.'},
+  {id:6,topic:'Quadratic Function',question:'For g(x) = −0.5x² + 8x + 20, at what capacity (GW) is efficiency maximised?',options:['4 GW','6 GW','8 GW','10 GW'],correct:2,explanation:'Vertex at x = −b/(2a) = −8/(2×−0.5) = 8 GW. Maximum efficiency g(8) = 52.'},
+  {id:7,topic:'Identity Function',question:'A household consumes 175 kWh. Using i(x) = x, how many credits do they receive?',options:['100 Credits','150 Credits','175 Credits','200 Credits'],correct:2,explanation:'i(175) = 175. The identity function returns exactly its input.'},
+  {id:8,topic:'Bijective Function',question:'Our ward-to-grid function is bijective. Which pair of properties does that require?',options:['Reflexive and transitive','Injective and surjective','Linear and quadratic','Symmetric and antisymmetric'],correct:1,explanation:'A bijection is both injective (one-to-one) and surjective (onto), guaranteeing a perfect one-to-one correspondence.'},
+];
+const tColors={'Cartesian Product':'#00e676','Relation':'#00b0ff','Injective Function':'#ffd600','Surjective Function':'#e040fb','Linear Function':'#00e676','Quadratic Function':'#ffd600','Identity Function':'#00b0ff','Bijective Function':'#e040fb'};
+
+const QuizSection = () => {
+  const [cur,setCur]=useState(0);
+  const [ans,setAns]=useState({});
+  const [showExp,setShowExp]=useState(false);
+  const [done,setDone]=useState(false);
+  useEffect(()=>{ window.MathJax?.typesetPromise?.(); },[cur]);
+  const q=questions[cur], a=ans[q.id]??null, color=tColors[q.topic]??'#00e676';
+  const score=Object.values(ans).filter(x=>x?.correct).length;
+  const pct=Math.round((score/questions.length)*100);
+  const grade=pct>=90?'Outstanding':pct>=75?'Excellent':pct>=60?'Good':'Keep Practising';
+  const gc=pct>=90?'#00e676':pct>=75?'#00b0ff':pct>=60?'#ffd600':'#e040fb';
+  const handleSel=idx=>{ if(a)return; setAns(p=>({...p,[q.id]:{selected:idx,correct:idx===q.correct}})); setShowExp(true); };
+  const handleNext=()=>{ if(cur<questions.length-1){setCur(c=>c+1);setShowExp(false);}else setDone(true); };
+  const handleReset=()=>{ setCur(0);setAns({});setShowExp(false);setDone(false); };
+
+  return (
+    <section id="quiz" className="py-24 px-6" style={{background:'rgba(6,13,26,.3)'}}>
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-white mb-4">Knowledge Check</h2>
+          <p className="text-gray-400 text-lg max-w-xl mx-auto">Test your understanding of the mathematical concepts explored in this project.</p>
+        </div>
+        {done ? (
+          <div className="glass-card p-10 rounded-2xl border border-white/10 text-center">
+            <Trophy size={56} className="mx-auto mb-4" style={{color:gc}}/>
+            <h3 className="text-3xl font-bold text-white mb-2">{grade}!</h3>
+            <p className="text-gray-400 mb-6">You answered {score} out of {questions.length} correctly.</p>
+            <div className="flex justify-center mb-8">
+              <svg width="140" height="140" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="56" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="10"/>
+                <circle cx="70" cy="70" r="56" fill="none" stroke={gc} strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={`${2*Math.PI*56}`} strokeDashoffset={`${2*Math.PI*56*(1-pct/100)}`}
+                  transform="rotate(-90 70 70)" style={{filter:`drop-shadow(0 0 8px ${gc})`,transition:'stroke-dashoffset 1s ease'}}/>
+                <text x="70" y="65" textAnchor="middle" fill="white" fontSize="26" fontWeight="bold">{pct}%</text>
+                <text x="70" y="84" textAnchor="middle" fill="#9ca3af" fontSize="11">{score}/{questions.length} correct</text>
+              </svg>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mb-8">
+              {questions.map((q,i)=>{ const a2=ans[q.id]; return (
+                <div key={q.id} className="p-2 rounded-lg text-xs font-medium text-center"
+                  style={{background:a2?.correct?'rgba(0,230,118,.15)':'rgba(255,82,82,.15)',
+                    border:`1px solid ${a2?.correct?'rgba(0,230,118,.4)':'rgba(255,82,82,.4)'}`,
+                    color:a2?.correct?'#00e676':'#ff5252'}}>Q{i+1}</div>
+              );})}
+            </div>
+            <button onClick={handleReset} className="flex items-center gap-2 mx-auto px-6 py-3 rounded-xl font-semibold text-sm"
+              style={{background:'rgba(0,230,118,.15)',border:'1px solid rgba(0,230,118,.4)',color:'#00e676',cursor:'pointer'}}>
+              <RotateCcw size={16}/> Try Again
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 rounded-full overflow-hidden" style={{height:6,background:'rgba(255,255,255,.1)'}}>
+                <div className="h-full rounded-full transition-all duration-500" style={{width:`${(cur/questions.length)*100}%`,background:color}}/>
+              </div>
+              <span className="text-sm text-gray-400 whitespace-nowrap">{cur+1} / {questions.length}</span>
+            </div>
+            <div className="glass-card p-8 rounded-2xl" style={{border:`1px solid ${color}30`,boxShadow:`0 0 30px ${color}10`}}>
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-5 uppercase tracking-wider"
+                style={{background:`${color}20`,border:`1px solid ${color}40`,color}}>{q.topic}</span>
+              <h3 className="text-xl font-bold text-white mb-7 leading-relaxed">{q.question}</h3>
+              <div className="space-y-3 mb-6">
+                {q.options.map((opt,idx)=>{
+                  const isSel=a?.selected===idx, isCorr=idx===q.correct;
+                  let bg='rgba(255,255,255,.04)', border='rgba(255,255,255,.1)', tc='#d1d5db';
+                  if(a){ if(isCorr){bg='rgba(0,230,118,.15)';border='rgba(0,230,118,.5)';tc='#00e676';}
+                    else if(isSel&&!isCorr){bg='rgba(255,82,82,.15)';border='rgba(255,82,82,.5)';tc='#ff5252';} }
+                  return (
+                    <button key={idx} onClick={()=>handleSel(idx)} disabled={!!a}
+                      className="w-full text-left flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200"
+                      style={{background:bg,border:`1px solid ${border}`,color:tc,cursor:a?'default':'pointer'}}>
+                      <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                        style={{background:a?'transparent':'rgba(255,255,255,.08)',border:`1px solid ${border}`,color:tc}}>
+                        {a&&isCorr?<CheckCircle size={16}/>:a&&isSel?<XCircle size={16}/>:String.fromCharCode(65+idx)}
+                      </span>
+                      <span className="text-sm leading-relaxed">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {showExp && (
+                <div className="rounded-xl p-4 mb-6 text-sm leading-relaxed"
+                  style={{background:a?.correct?'rgba(0,230,118,.08)':'rgba(255,82,82,.08)',border:`1px solid ${a?.correct?'rgba(0,230,118,.25)':'rgba(255,82,82,.25)'}`,color:'#d1d5db'}}>
+                  <span className="font-semibold" style={{color:a?.correct?'#00e676':'#ff5252'}}>{a?.correct?'Correct! ':'Not quite. '}</span>
+                  {q.explanation}
+                </div>
+              )}
+              {a && (
+                <button onClick={handleNext} className="flex items-center gap-2 ml-auto px-6 py-3 rounded-xl font-semibold text-sm"
+                  style={{background:`${color}20`,border:`1px solid ${color}50`,color,cursor:'pointer'}}>
+                  {cur<questions.length-1?'Next Question':'See Results'}<ChevronRight size={16}/>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-5 justify-center">
+              {questions.map((_,i)=>{ const a2=ans[questions[i].id]; return (
+                <div key={i} className="w-2 h-2 rounded-full transition-all"
+                  style={{background:i===cur?color:a2?.correct?'rgba(0,230,118,.5)':a2?'rgba(255,82,82,.5)':'rgba(255,255,255,.12)',
+                    transform:i===cur?'scale(1.5)':'scale(1)'}}/>
+              );})}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Footer
+// ══════════════════════════════════════════════════════════════════════════════
+const Footer = () => (
+  <footer className="py-16 px-6 border-t border-white/10 relative">
+    <div className="absolute top-0 left-0 right-0" style={{height:1,background:'linear-gradient(to right,transparent,#00e676,#00b0ff,#ffd600,transparent)'}}/>
+    <div className="max-w-4xl mx-auto text-center space-y-4">
+      <h3 className="text-2xl font-bold text-white">Modeling Energy Systems using Relations and Functions</h3>
+      <p className="text-gray-400 text-lg">Optional Mathematics — Integrated Functions Modeling</p>
+      <p className="text-gray-500 text-sm">June 14th, Sunday, 2026</p>
+      <div className="flex justify-center gap-8 pt-4 flex-wrap">
+        {['Introduction','Relations','Mapping','Linear','Quadratic','Identity','Dashboard','Summary'].map(l=>(
+          <a key={l} href={`#${l.toLowerCase()}`} className="text-xs text-gray-500 hover:text-green-400 transition-colors">{l}</a>
+        ))}
+      </div>
+      <div className="pt-8 border-t border-white/10 mt-6">
+        <div className="inline-flex flex-col items-center gap-1 glass-card px-10 py-6 rounded-2xl"
+          style={{border:'1px solid rgba(0,230,118,.2)',boxShadow:'0 0 30px rgba(0,230,118,.08)'}}>
+          <p className="text-white text-xl font-bold tracking-wide">Ashutosh Prasad Bohara</p>
+          <a href="mailto:ashutoshprasadbohra.ssa.5d@gmail.com" className="text-sm hover:text-green-400 transition-colors" style={{color:'#00b0ff'}}>
+            ashutoshprasadbohra.ssa.5d@gmail.com
+          </a>
+          <div className="flex items-center gap-3 mt-2 text-gray-400 text-sm">
+            <span>Grade 9</span><span className="text-white/20">|</span>
+            <span>Integrated Project Website</span><span className="text-white/20">|</span>
+            <span>Creative Academy</span>
+          </div>
+        </div>
+      </div>
+      <div className="pt-4 flex items-center justify-center gap-3">
+        <div className="w-2 h-2 rounded-full pulse-anim" style={{background:'#00e676'}}/>
+        <span className="text-xs text-gray-600">Smart Grid Active</span>
+        <div className="w-2 h-2 rounded-full pulse-anim" style={{background:'#00b0ff',animationDelay:'.5s'}}/>
+      </div>
+    </div>
+  </footer>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// App
+// ══════════════════════════════════════════════════════════════════════════════
+const App = () => (
+  <div className="min-h-screen" style={{background:'hsl(217,62%,6%)',color:'hsl(0,0%,95%)'}}>
+    <NavBar/>
+    <main>
+      <HeroSection/>
+      <RelationsSection/>
+      <MappingSection/>
+      <LinearSection/>
+      <QuadraticSection/>
+      <IdentitySection/>
+      <DashboardSection/>
+      <SummarySection/>
+      <QuizSection/>
+    </main>
+    <Footer/>
+  </div>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
